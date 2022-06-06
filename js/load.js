@@ -18,8 +18,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 function load_races(country, starttime, endtime) {
-    
-    var url = "https://p7vxc94qmb.execute-api.ap-southeast-1.amazonaws.com/prod"
+  // Generate Human Readable Country Name
+  var countryStr = country.charAt(0).toUpperCase() + country.slice(1);
+  if (country === "newzealand") {
+    countryStr = "New Zealand"
+  }
+
+  //// Generate Human-Readable Dates
+  // Perform conversion for start date
+  starttime_str = String(starttime);
+  start_year = starttime_str.substring(0,4);
+  start_month = starttime_str.substring(4,6);
+  start_day = starttime_str.substring(6,8);
+  startdate_str = `${start_day}/${start_month}/${start_year}`;
+  
+  // Perform conversion for end date
+  endtime_str = String(endtime);
+  end_year = endtime_str.substring(0,4);
+  end_month = endtime_str.substring(4,6);
+  end_day = endtime_str.substring(6,8);
+  enddate_str = `${end_day}/${end_month}/${end_year}`;
+
+  // API Endpoint
+  var url = "https://p7vxc94qmb.execute-api.ap-southeast-1.amazonaws.com/prod"
   // Fetch list of emails
   fetch(`${url}/listraces?country=${country}&starttime=${starttime}&endtime=${endtime}`)
   .then(response => response.json())
@@ -27,6 +48,9 @@ function load_races(country, starttime, endtime) {
     // Print emails
     console.log(results);
     results.reverse().forEach(display_race_link);
+    // Add header here
+    raceListHeaderHtml = `<div id="racelistheader" style="font-size:16px"><b>Races in ${countryStr} from ${startdate_str} to ${enddate_str}</b></div>`;
+    document.querySelector('#raceresults').insertAdjacentHTML('afterend',raceListHeaderHtml);
   });
 }
     
@@ -55,8 +79,14 @@ function load_results(country, date_time) {
   day = datetime_str.substring(6,8);
   datestr = `${day}/${month}/${year}`;
 
+  // Capitalise first letter of the country
+  var countryStr = country.charAt(0).toUpperCase() + country.slice(1);
+  if (country === "newzealand") {
+    countryStr = "New Zealand"
+  }
+
   // Clear existing content and generate headers
-  document.getElementById("mainbody").innerHTML = `<div id="results"><h3>Results for ${country} race on ${datestr}</h3></div>`;
+  document.getElementById("mainbody").innerHTML = `<hr><div id="results" style="font-size:16px"><b>Results for ${countryStr} race on ${datestr}</b></div>`;
   
   // API Endpoint for Getting Race Results
   var url = "https://p7vxc94qmb.execute-api.ap-southeast-1.amazonaws.com/prod"
@@ -67,6 +97,8 @@ function load_results(country, date_time) {
     // Print Race Results
     console.log(results);
     results.reverse().forEach(display_result_row);
+    tableHeaderHtml = '<table><tr style="background-color:#0747ad; color:white"><td style="width:80px;border:none;padding-left:5px"><b>Rank</b></td><td style="width:200px;border:none"><b>Driver</b></td><td style="width:150px;border:none;text-align:center;"><b>Team</b></td><td style="width:80px;text-align:center;border:none"><b>Points</b></td></tr></table>';
+    document.querySelector('#results').insertAdjacentHTML('afterend',tableHeaderHtml);
   });
 }
 
@@ -94,7 +126,12 @@ function display_result_row(contents) {
   driver = contents.driver;
   team = contents.team;
   points = contents.points;
-  result_row.innerHTML = `<table><tr style="background-color:#FFFFFF"><td style="width:20px;border:none;padding-left:5px"><b>${position}</b></td><td style="width:200px;border:none"><b>${driver}</b></td><td style="width:150px;border:none;text-align:center;color:gray"><b>${team}</b></td><td style="width:50px%;text-align:center;border:none"><b>${points}</b></td></tr></table>`;
+  if (parseInt(position) % 2 == 0) {
+    result_row.innerHTML = `<table><tr style="background-color:#FFFFFF"><td style="width:80px;border:none;padding-left:5px"><b>${position}</b></td><td style="width:200px;border:none"><b>${driver}</b></td><td style="width:150px;border:none;text-align:center;color:gray"><b>${team}</b></td><td style="width:80px;text-align:center;border:none"><b>${points}</b></td></tr></table>`;
+  }
+  else {
+    result_row.innerHTML = `<table><tr style="background-color:#e3e3e3"><td style="width:80px;border:none;padding-left:5px"><b>${position}</b></td><td style="width:200px;border:none"><b>${driver}</b></td><td style="width:150px;border:none;text-align:center;color:gray"><b>${team}</b></td><td style="width:80px;text-align:center;border:none"><b>${points}</b></td></tr></table>`;
+  }
   result_row.setAttribute("data-id", position);
   var entryHTMLString = `<div data-id="${position}" id="resultrow">${result_row.innerHTML}</div>`;
 
