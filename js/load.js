@@ -81,7 +81,7 @@ function display_race_link(contents) {
   datestr = `${day}/${month}/${year}`;
   // race_row.innerHTML = datestr;
   // race_row.setAttribute("data-id", datetime_str);
-  var raceHTMLString = `<button data-datetime="${datetime_str}" data-country="${country}" id="raceentry" onclick=load_results(\'${country}\',\'${datetime_str}\') class="btn btn-info">${datestr}</button>`;
+  var raceHTMLString = `<button data-datetime="${datetime_str}" data-country="${country}" id="raceentry" onclick=load_results(\'${country}\',\'${datetime_str}\') class="btn btn-info" style="margin: 5px">${datestr}</button>`;
 
   // Add post to DOM
   document.querySelector('#raceresults').insertAdjacentHTML('afterend',raceHTMLString);
