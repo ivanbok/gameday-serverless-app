@@ -8,6 +8,23 @@ import boto3
 client = boto3.client('dynamodb')
 
 def lambda_handler(event, context):
+    
+    generateresults("singapore")
+    generateresults("australia")
+    generateresults("new zealand")
+    generateresults("thailand")
+
+    response = {
+        'statusCode': 200,
+        'body': 'successfully created item!',
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        },
+    }
+    return response
+
+def generateresults(country):
     # Generate Results
     results = generatewinnerlist()
     
@@ -20,7 +37,7 @@ def lambda_handler(event, context):
     dt_string = now.strftime("%Y%m%d") + "1200"
 
     # Begin building item    
-    item = {"country": {'S': 'singapore'}, "datetime": {'N': dt_string}}
+    item = {"country": {'S': country}, "datetime": {'N': dt_string}}
     
     # Load racers
     count = 1
@@ -34,16 +51,6 @@ def lambda_handler(event, context):
     data = client.put_item(
         TableName='racingresults',
         Item=item)
-    
-    response = {
-        'statusCode': 200,
-        'body': 'successfully created item!',
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        },
-    }
-    return response
 
 def generatewinnerlist():
     driverlist = [{"driver": "Max Verstappen", "team": "Red Bull"},\
