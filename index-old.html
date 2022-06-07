@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Game Results</title>
+    <script src="js/load.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+<body>
+
+<label for="country">Country:</label>
+
+<select name="country" id="country">
+  <option value="singapore" selected>Singapore</option>
+  <option value="australia">Australia</option>
+  <option value="newzealand">New Zealand</option>
+  <option value="thailand">Thailand</option>
+</select>
+
+<form>
+    Start Date: <input type="text" id="startdate" name="Start Date" value="04/06/2022">
+    End Date: <input type="text" id="enddate" name="End Date" value="06/06/2022">
+</form>
+
+<br>
+<button type="button" id="filter">Filter</button>
+
+<hr>
+
+<div id="mainracebody">
+    <div id="raceresults"></div>
+</div>
+
+<div id="mainbody">
+    <div id="results"></div>
+</div>
+
+</body>
+</html>
