@@ -280,7 +280,7 @@ Resources:
     Type: "AWS::Lambda::Function"
     Properties: 
       Handler: "index.handler"
-      FunctionName: "listraces"
+      FunctionName: "generateracingdata"
       Role: 
         Fn::GetAtt: 
           - "LambdaDDBExecutionRole"
