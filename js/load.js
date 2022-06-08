@@ -1,3 +1,8 @@
+// Global Variables
+
+apiurl = "https://2foxz7t1qb.execute-api.ap-southeast-1.amazonaws.com"
+
+// Script Starts Below
 document.addEventListener('DOMContentLoaded', function() {
   // By default, load results
   var country = "singapore";
@@ -42,10 +47,10 @@ end_month = endtime_str.substring(4,6);
 end_day = endtime_str.substring(6,8);
 enddate_str = `${end_day}/${end_month}/${end_year}`;
 
-// API Endpoint
-var url = "https://2foxz7t1qb.execute-api.ap-southeast-1.amazonaws.com/prod"
+// API Endpoint (Deprecated, use global variable)
+// var url = "https://2foxz7t1qb.execute-api.ap-southeast-1.amazonaws.com"
 // Fetch list of emails
-fetch(`${url}/listraces?country=${country}&starttime=${starttime}&endtime=${endtime}`)
+fetch(`${apiurl}/prod/listraces?country=${country}&starttime=${starttime}&endtime=${endtime}`)
 .then(response => response.json())
 .then(results => {
   // Print emails
@@ -91,10 +96,10 @@ if (country === "newzealand") {
 // Clear existing content and generate headers
 document.getElementById("mainbody").innerHTML = `<hr><div id="results" style="font-size:16px"><b>Results for ${countryStr} race on ${datestr}</b></div>`;
 
-// API Endpoint for Getting Race Results
-var url = "https://2foxz7t1qb.execute-api.ap-southeast-1.amazonaws.com/prod"
+// API Endpoint for Getting Race Results (deprecated, use global variables)
+// var url = "https://2foxz7t1qb.execute-api.ap-southeast-1.amazonaws.com"
 // Fetch Race Results
-fetch(`${url}/raceresults?country=${country}&datetime=${date_time}`)
+fetch(`${apiurl}/prod/raceresults?country=${country}&datetime=${date_time}`)
 .then(response => response.json())
 .then(results => {
   // Print Race Results
