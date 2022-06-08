@@ -358,6 +358,36 @@ Outputs:
           - ListRacesLambdaARN: !GetAtt ListRacesLambda.Arn
       ResourceId: !Ref ApiGatewayListRacesResource
       RestApiId: !Ref apiGateway
+  
+  # Set CORS configuration for OPTIONS Preflight Method for Listrace API call 
+  apiGatewayListRacesCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      ResourceId: !Ref ApiGatewayListRacesResource
+      RestApiId: !Ref apiGateway
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
 
   # Create Race Results Resource
   ApiGatewayRaceResultsResource:
@@ -367,7 +397,7 @@ Outputs:
       PathPart: 'lambda'
       RestApiId: !Ref apiGateway
   # Create Get Race Results Method
-  # Still requires CORS configuration and query string parameters
+  # Still requires query string parameters
   apiGatewayGetRaceResultMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -381,6 +411,38 @@ Outputs:
           - ListRacesLambdaARN: !GetAtt RacingResultsLambda.Arn
       ResourceId: !Ref ApiGatewayRaceResultsResource
       RestApiId: !Ref apiGateway
+  
+  # Set CORS configuration for OPTIONS Preflight Method for Race Results
+  apiGatewayGetRaceResultCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId:
+        Ref: apiGateway
+      ResourceId:
+        Ref: ApiGatewayRaceResultsResource
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
 
   # Create Deployment
   apiGatewayDeployment:
