@@ -1,0 +1,393 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Resources:
+  # Create S3 Bucket for Static Website Hosting
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+    DeletionPolicy: Delete
+  BucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      PolicyDocument:
+        Id: S3PublicReadPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3Bucket
+                - /*
+      Bucket: !Ref S3Bucket
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt 
+      - S3Bucket
+      - WebsiteURL
+    Description: URL for website hosted on S3
+  S3BucketSecureURL:
+    Value: !Join 
+      - ''
+      - - 'https://'
+        - !GetAtt 
+          - S3Bucket
+          - DomainName
+    Description: Name of S3 bucket to hold website content
+
+  ## Create Lambda Functions and Associated IAM Resources
+  # Create Lambda Execution Role that allows it to call DynamoDB
+  LambdaDDBExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "s3:*"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            Resource: "*"
+      - PolicyName: AmazonDynamoDBFullAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - dynamodb:*
+            - dax:*
+            - application-autoscaling:DeleteScalingPolicy
+            - application-autoscaling:DeregisterScalableTarget
+            - application-autoscaling:DescribeScalableTargets
+            - application-autoscaling:DescribeScalingActivities
+            - application-autoscaling:DescribeScalingPolicies
+            - application-autoscaling:PutScalingPolicy
+            - application-autoscaling:RegisterScalableTarget
+            - cloudwatch:DeleteAlarms
+            - cloudwatch:DescribeAlarmHistory
+            - cloudwatch:DescribeAlarms
+            - cloudwatch:DescribeAlarmsForMetric
+            - cloudwatch:GetMetricStatistics
+            - cloudwatch:ListMetrics
+            - cloudwatch:PutMetricAlarm
+            - cloudwatch:GetMetricData
+            - datapipeline:ActivatePipeline
+            - datapipeline:CreatePipeline
+            - datapipeline:DeletePipeline
+            - datapipeline:DescribeObjects
+            - datapipeline:DescribePipelines
+            - datapipeline:GetPipelineDefinition
+            - datapipeline:ListPipelines
+            - datapipeline:PutPipelineDefinition
+            - datapipeline:QueryObjects
+            - ec2:DescribeVpcs
+            - ec2:DescribeSubnets
+            - ec2:DescribeSecurityGroups
+            - iam:GetRole
+            - iam:ListRoles
+            - kms:DescribeKey
+            - kms:ListAliases
+            - sns:CreateTopic
+            - sns:DeleteTopic
+            - sns:ListSubscriptions
+            - sns:ListSubscriptionsByTopic
+            - sns:ListTopics
+            - sns:Subscribe
+            - sns:Unsubscribe
+            - sns:SetTopicAttributes
+            - lambda:CreateFunction
+            - lambda:ListFunctions
+            - lambda:ListEventSourceMappings
+            - lambda:CreateEventSourceMapping
+            - lambda:DeleteEventSourceMapping
+            - lambda:GetFunctionConfiguration
+            - lambda:DeleteFunction
+            - resource-groups:ListGroups
+            - resource-groups:ListGroupResources
+            - resource-groups:GetGroup
+            - resource-groups:GetGroupQuery
+            - resource-groups:DeleteGroup
+            - resource-groups:CreateGroup
+            - tag:GetResources
+            - kinesis:ListStreams
+            - kinesis:DescribeStream
+            - kinesis:DescribeStreamSummary
+            Effect: Allow
+            Resource: "*"
+          - Action: cloudwatch:GetInsightRuleReport
+            Effect: Allow
+            Resource: arn:aws:cloudwatch:*:*:insight-rule/DynamoDBContributorInsights*
+          - Action:
+            - iam:PassRole
+            Effect: Allow
+            Resource: "*"
+            Condition:
+              StringLike:
+                iam:PassedToService:
+                - application-autoscaling.amazonaws.com
+                - application-autoscaling.amazonaws.com.cn
+                - dax.amazonaws.com
+          - Effect: Allow
+            Action:
+            - iam:CreateServiceLinkedRole
+            Resource: "*"
+            Condition:
+              StringEquals:
+                iam:AWSServiceName:
+                - replication.dynamodb.amazonaws.com
+                - dax.amazonaws.com
+                - dynamodb.application-autoscaling.amazonaws.com
+                - contributorinsights.dynamodb.amazonaws.com
+                - kinesisreplication.dynamodb.amazonaws.com
+
+  # Create Lambda Function to List Races
+  ListRacesLambda: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Handler: "index.handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaDDBExecutionRole"
+          - "Arn"
+      Runtime: "python3.9"
+      Code: 
+        ZipFile: |
+          import json
+          import boto3
+          from boto3.dynamodb.conditions import Key, Attr
+
+          client = boto3.client('dynamodb')
+
+          def lambda_handler(event, context):
+            country = event["queryStringParameters"]["country"]
+            starttime = event["queryStringParameters"]["starttime"]
+            endtime = event["queryStringParameters"]["endtime"]
+            
+            data = client.query(
+              TableName='racingresults',
+              KeyConditionExpression='country = :country AND #dt BETWEEN :date1 AND :date2',
+              ExpressionAttributeValues={
+                ':country': {
+                  'S': country
+                },
+                ':date1': {
+                  'N': starttime
+                },
+                ':date2': {
+                  'N': endtime
+                },
+              },
+              ExpressionAttributeNames={
+                "#dt": "datetime"}
+            )
+            
+            if data["Count"] == 0:
+              body = json.dumps({})
+            else:
+              races = []
+              for item in data["Items"]:
+                  races.append({"country": item["country"]["S"], "datetime": item["datetime"]["N"]})
+              body = json.dumps(races)
+
+            response = {
+                'statusCode': 200,
+                'body': body,
+                'headers': {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*'
+                },
+            }
+            
+            return response
+
+  # Create Lambda Function to get Results of a Given Race
+  RacingResultsLambda: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Handler: "index.handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaDDBExecutionRole"
+          - "Arn"
+      Runtime: "python3.9"
+      Code: 
+        ZipFile: |
+          import json
+          import boto3
+          from boto3.dynamodb.conditions import Key, Attr
+
+          client = boto3.client('dynamodb')
+
+          def lambda_handler(event, context):
+            country = event["queryStringParameters"]["country"]
+            date_time = event["queryStringParameters"]["datetime"]
+            
+            data = client.query(
+              TableName='racingresults',
+              KeyConditionExpression='country = :country AND #dt = :date_time',
+              ExpressionAttributeValues={
+                ':country': {
+                  'S': country
+                },
+                ':date_time': {
+                  'N': date_time
+                },
+              },
+              ExpressionAttributeNames={
+                "#dt": "datetime"}
+            )
+            
+            if data["Count"] == 0:
+              body = json.dumps()
+            else:
+              # body = json.dumps(data)
+              num_racers = int(len(data["Items"][0])-2)
+              body_list = []
+              for i in range(1,num_racers+1):
+                body_list.append(winnerstrtodict(data["Items"][0][str(i)]["S"]))
+              body = json.dumps(body_list)
+              # body = data["Items"][0]["1"]["S"]
+            
+            response = {
+                'statusCode': 200,
+                'body': body,
+                'headers': {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*'
+                },
+            }
+            
+            return response
+
+          def winnerstrtodict(stringinput):
+            arr = stringinput.split(",")
+            dictoutput = {"position": arr[0], "driver": arr[1], "team": arr[2], "points": arr[3]}
+            return dictoutput
+
+  # Create Main DynamoDB Table
+  Type: AWS::DynamoDB::Table
+  Properties: 
+    AttributeDefinitions: 
+      - 
+        AttributeName: "country"
+        AttributeType: "S"
+      - 
+        AttributeName: "datetime"
+        AttributeType: "N"
+      - 
+        AttributeName: "1"
+        AttributeType: "S"
+      - 
+        AttributeName: "2"
+        AttributeType: "S"
+      - 
+        AttributeName: "3"
+        AttributeType: "S"
+      - 
+        AttributeName: "4"
+        AttributeType: "S"
+      - 
+        AttributeName: "5"
+        AttributeType: "S"
+    BillingMode: PROVISIONED
+    KeySchema: 
+      - 
+        AttributeName: "country"
+        KeyType: "HASH"
+      - 
+        AttributeName: "datetime"
+        KeyType: "RANGE"
+    ProvisionedThroughput: 
+      ReadCapacityUnits: "1"
+      WriteCapacityUnits: "1"
+    TableName: "racingresults"
+
+  ## Create API Gateway and associated IAM Resources
+  # Create API
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Example API Gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: RacingResultsAPI
+
+  # Create List Races Resource
+  ApiGatewayListRacesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt apiGateway.RootResourceId
+      PathPart: 'lambda'
+      RestApiId: !Ref apiGateway
+  # Create List Races Method
+  # Still requires CORS configuration and query string parameters
+  apiGatewayListRacesMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: GET
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListRacesLambdaARN}/invocations
+          - ListRacesLambdaARN: !GetAtt ListRacesLambda.Arn
+      ResourceId: !Ref ApiGatewayListRacesResource
+      RestApiId: !Ref apiGateway
+
+  # Create Race Results Resource
+  ApiGatewayRaceResultsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt apiGateway.RootResourceId
+      PathPart: 'lambda'
+      RestApiId: !Ref apiGateway
+  # Create Get Race Results Method
+  # Still requires CORS configuration and query string parameters
+  apiGatewayGetRaceResultMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: GET
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListRacesLambdaARN}/invocations
+          - ListRacesLambdaARN: !GetAtt RacingResultsLambda.Arn
+      ResourceId: !Ref ApiGatewayRaceResultsResource
+      RestApiId: !Ref apiGateway
+
+  # Create Deployment
+  apiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - apiGatewayListRacesMethod
+      - apiGatewayGetRaceResultMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: prod
