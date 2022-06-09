@@ -16,7 +16,7 @@ Resources:
     DependsOn: apiGateway
     Properties:
       AvailabilityZone: ap-southeast-1a
-      ImageId: ami-055d15d9cfddf7bd3
+      ImageId: ami-0bd6906508e74f692
       InstanceType: t2.micro
       SecurityGroups:
       - !Ref WebServerSecurityGroup
@@ -28,13 +28,13 @@ Resources:
           sudo yum install git -y
           sudo git clone https://github.com/ivanbok/gameday-serverless-app.git
           sudo cp -a ./gameday-serverless-app/. /var/www/html
-          sudo sed 's/replacethiswiththeapiurl/${!Ref apiGateway}/g' /var/www/html/js/load-template.js > /var/www/html/js/load.js
+          sudo sed 's/replacethiswiththeapiurl/${apiGateway}/g' /var/www/html/js/load-template.js > /var/www/html/js/load.js
           sudo systemctl start httpd
           sudo systemctl enable httpd
   WebServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Ref SecurityGroupDescription
+      GroupDescription: "Allow HTTP and SSH"
       SecurityGroupIngress:
       - CidrIp: 0.0.0.0/0
         FromPort: 22
