@@ -66,10 +66,6 @@ Resources:
       MaxSize: '4'
       TargetGroupARNs:
       - !Ref MyALBTG
-    CreationPolicy:
-      ResourceSignal:
-        Count: '3'
-        Timeout: PT15M
   
   ASGScalingPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
@@ -96,12 +92,6 @@ Resources:
           sudo sed 's/replacethiswiththeapiurl/${apiGateway}/g' /var/www/html/js/load-template.js > /var/www/html/js/load.js
           sudo systemctl start httpd
           sudo systemctl enable httpd
-          yum update -y aws-cfn-bootstrap
-          # Start cfn-init
-          /opt/aws/bin/cfn-init -s ${AWS::StackId} -r MyInstance --region ${AWS::Region}
-          # Start cfn-signal to the wait condition
-          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
-
       SecurityGroups: 
       - !Ref MyEC2SecurityGroup
 
