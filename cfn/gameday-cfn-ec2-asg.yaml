@@ -73,7 +73,9 @@ Resources:
       AutoScalingGroupName: !Ref AutoScalingGroup
       EstimatedInstanceWarmup: 300
       PolicyType: TargetTrackingScaling
-      TargetTrackingConfiguration: ASGAverageCPUUtilization
+      TargetTrackingConfiguration: 
+        PredefinedMetricSpecification: ASGAverageCPUUtilization
+        TargetValue: 60
 
   LaunchConfig:
     DependsOn: apiGateway
