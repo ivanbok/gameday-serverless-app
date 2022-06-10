@@ -76,7 +76,10 @@ Resources:
       TargetTrackingConfiguration: 
         PredefinedMetricSpecification: 
           PredefinedMetricType: ASGAverageCPUUtilization
-          ResourceLabel: !Sub "${MyALB.LoadBalancerFullName}/${MyALBTG.TargetGroupFullName}"
+          ResourceLabel: !Sub 
+          - "${LoadBalancerFullName}/${TargetGroupFullName}"
+          - LoadBalancerFullName: !GetAtt MyALB.LoadBalancerFullName
+            TargetGroupFullName: !GetAtt MyALBTG.TargetGroupFullName
         TargetValue: 60
 
   LaunchConfig:
