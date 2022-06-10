@@ -2,8 +2,11 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 Parameters:
-  PublicSubnetID:
-    Description: 'The IDs of the public subnet to be used for the ALB'
+  PublicSubnetID1:
+    Description: 'The IDs of the first public subnet to be used for the ALB'
+    Type: AWS::EC2::Subnet::Id
+  PublicSubnetID2:
+    Description: 'The IDs of the second public subnet to be used for the ALB'
     Type: AWS::EC2::Subnet::Id
   VPCId:
     Description: 'The VPC ID to be used for deployment'
@@ -18,9 +21,10 @@ Resources:
       Name: gameday-alb
       Scheme: internet-facing
       SecurityGroups: 
-        - !Ref MyALBSecurityGroup
+        - !GetAtt MyALBSecurityGroup.GroupId
       Subnets: 
-        - !Ref PublicSubnetID
+        - !Ref PublicSubnetID1
+        - !Ref PublicSubnetID2
   
   MyALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -44,10 +48,10 @@ Resources:
       Name: gameday-tg
       Port: 80
       Protocol: HTTP
-      ProtocolVersion: String
+      ProtocolVersion: HTTP1
       TargetType: instance
       UnhealthyThresholdCount: 2
-      VpcId: String
+      VpcId: !Ref VPCId
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -92,6 +96,12 @@ Resources:
           sudo sed 's/replacethiswiththeapiurl/${apiGateway}/g' /var/www/html/js/load-template.js > /var/www/html/js/load.js
           sudo systemctl start httpd
           sudo systemctl enable httpd
+          yum update -y aws-cfn-bootstrap
+          # Start cfn-init
+          /opt/aws/bin/cfn-init -s ${AWS::StackId} -r MyInstance --region ${AWS::Region}
+          # Start cfn-signal to the wait condition
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource SampleWaitCondition --region ${AWS::Region}
+
       SecurityGroups: 
       - !Ref MyEC2SecurityGroup
 
@@ -104,7 +114,7 @@ Resources:
         FromPort: 22
         ToPort: 22
         IpProtocol: tcp
-      - SourceSecurityGroupId: !Ref MyALBSecurityGroup
+      - SourceSecurityGroupId: !GetAtt MyALBSecurityGroup.GroupId
         FromPort: 80
         ToPort: 80
         IpProtocol: tcp
