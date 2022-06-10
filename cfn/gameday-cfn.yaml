@@ -316,7 +316,7 @@ Resources:
           client = boto3.client('dynamodb')
 
           def handler(event, context):
-              datetimelist = range(20220601,20220610)
+              datetimelist = range(20220601,20220617)
               for date_time in datetimelist:
                   generateresults("singapore", date_time)
                   generateresults("australia", date_time)
