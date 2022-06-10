@@ -74,7 +74,9 @@ Resources:
       EstimatedInstanceWarmup: 300
       PolicyType: TargetTrackingScaling
       TargetTrackingConfiguration: 
-        PredefinedMetricSpecification: ASGAverageCPUUtilization
+        PredefinedMetricSpecification: 
+          PredefinedMetricType: ASGAverageCPUUtilization
+          ResourceLabel: !Sub "${MyALB.LoadBalancerFullName}/${MyALBTG.TargetGroupFullName}"
         TargetValue: 60
 
   LaunchConfig:
