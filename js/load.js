@@ -4,10 +4,11 @@ apiurl = "https://2foxz7t1qb.execute-api.ap-southeast-1.amazonaws.com"
 
 // Script Starts Below
 document.addEventListener('DOMContentLoaded', function() {
+
   // By default, load results
   var country = "singapore";
   var starttime = "202206041000";
-  var endtime = "202206092000";
+  var endtime = "202206172000";
   // load_results(country, starttime, endtime);
   load_races(country, starttime, endtime);
   
