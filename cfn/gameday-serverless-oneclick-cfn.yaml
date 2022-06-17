@@ -1,128 +1,146 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
 
-Parameters:
-  PublicSubnetID1:
-    Description: 'The IDs of the first public subnet to be used for the ALB'
-    Type: AWS::EC2::Subnet::Id
-  PublicSubnetID2:
-    Description: 'The IDs of the second public subnet to be used for the ALB'
-    Type: AWS::EC2::Subnet::Id
-  VPCId:
-    Description: 'The VPC ID to be used for deployment'
-    Type: AWS::EC2::VPC::Id
-
 Resources:
-  ## Resources for Presentation Layer
-  # ALB/ASG/EC2
-  MyALB:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties: 
-      Name: gameday-alb
-      Scheme: internet-facing
-      SecurityGroups: 
-        - !GetAtt MyALBSecurityGroup.GroupId
-      Subnets: 
-        - !Ref PublicSubnetID1
-        - !Ref PublicSubnetID2
-  
-  MyALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties: 
-      DefaultActions: 
-        - TargetGroupArn: !Ref MyALBTG
-          Type: forward
-      LoadBalancerArn: !Ref MyALB
-      Port: 80
-      Protocol: HTTP
-
-  MyALBTG:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties: 
-      HealthCheckIntervalSeconds: 30
-      HealthCheckPath: /
-      HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 5
-      IpAddressType: ipv4
-      Name: gameday-tg
-      Port: 80
-      Protocol: HTTP
-      ProtocolVersion: HTTP1
-      TargetType: instance
-      UnhealthyThresholdCount: 2
-      VpcId: !Ref VPCId
-
-  AutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
+  ########################################################################
+  # Create S3 Bucket for Static Website Hosting ##########################
+  ########################################################################
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
     Properties:
-      AvailabilityZones: 
-        Fn::GetAZs: 
-          Ref: "AWS::Region"
-      LaunchConfigurationName:
-        Ref: LaunchConfig
-      DesiredCapacity: '3'
-      MinSize: '1'
-      MaxSize: '4'
-      TargetGroupARNs:
-      - !Ref MyALBTG
+      # AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+    DeletionPolicy: Delete
   
-  ASGScalingPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
-    Properties: 
-      AutoScalingGroupName: !Ref AutoScalingGroup
-      EstimatedInstanceWarmup: 300
-      PolicyType: TargetTrackingScaling
-      TargetTrackingConfiguration: 
-        PredefinedMetricSpecification: 
-          PredefinedMetricType: ASGAverageCPUUtilization
-        TargetValue: 60
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: 
+          -
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
-  LaunchConfig:
+  TheBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Join [ "", [ "arn:aws:s3:::", !Ref S3Bucket, "/*" ] ]
+            Principal:
+              CanonicalUser: !GetAtt TheCloudFrontOriginAccessIdentity.S3CanonicalUserId
+
+  ########################################################################
+  # Create Temporary EC2 Instance for file upload to S3 ##################
+  ########################################################################
+
+  MyInstance:
+    Type: AWS::EC2::Instance
     DependsOn: apiGateway
-    Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      ImageId: !FindInMap [EC2AmiIds, !Ref AWS::Region, "ImageId"]
+      AvailabilityZone: ap-southeast-1a
+      ImageId: ami-0bd6906508e74f692
       InstanceType: t2.micro
+      SecurityGroups:
+      - !Ref TempServerSecurityGroup
+      IamInstanceProfile: !Ref EC2InstanceProfile
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
           sudo yum update -y
-          sudo yum install httpd -y
           sudo yum install git -y
           sudo git clone https://github.com/ivanbok/gameday-serverless-app.git
           sudo cp -a ./gameday-serverless-app/. /var/www/html
-          sudo sed 's/replacethiswiththeapiurl/${apiGateway}/g' /var/www/html/js/load-template.js > /var/www/html/js/load.js
-          sudo systemctl start httpd
-          sudo systemctl enable httpd
-      SecurityGroups: 
-      - !Ref MyEC2SecurityGroup
-
-  MyEC2SecurityGroup:
+          sudo sed 's/replacethiswiththeapiurl/${apiGateway}/g' /gameday-serverless-app/js/load-template.js > /gameday-serverless-app/js/load.js
+          cd /
+          sudo aws s3 cp gameday-serverless-app s3://${S3Bucket} --recursive
+          # sudo shutdown now
+  TempServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: 'Allow SSH and HTTP'
+      GroupDescription: "Allow SSH and HTTP"
       SecurityGroupIngress:
       - CidrIp: 0.0.0.0/0
         FromPort: 22
         ToPort: 22
         IpProtocol: tcp
-      - SourceSecurityGroupId: !GetAtt MyALBSecurityGroup.GroupId
-        FromPort: 80
-        ToPort: 80
-        IpProtocol: tcp
-
-  MyALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: 'Allow HTTP from internet'
-      SecurityGroupIngress:
       - CidrIp: 0.0.0.0/0
         FromPort: 80
         ToPort: 80
         IpProtocol: tcp
+  
+  EC2InstanceProfile: 
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      Path: "/"
+      Roles: 
+        - 
+          Ref: "EC2Role"
+  
+  EC2Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'       # Not aligned with security best practices. To refine and reduce allowable actions and resources for testing only
+                Resource: '*'
 
-  ## Create Lambda Functions and Associated IAM Resources
+  ########################################################################
+  # Create CloudFront Distribution #######################################
+  ########################################################################
+
+  TheCloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+          TargetOriginId: origin-s3-bucket
+          ViewerProtocolPolicy: allow-all
+        DefaultRootObject: index.html
+        Enabled: true
+        Origins:
+          - DomainName:
+              !Join [ "", [ !Ref S3Bucket, ".s3.amazonaws.com" ] ]
+            Id: origin-s3-bucket
+            S3OriginConfig:
+              OriginAccessIdentity:
+                !Join [ "", [ "origin-access-identity/cloudfront/", !Ref TheCloudFrontOriginAccessIdentity ] ]
+        PriceClass: 'PriceClass_All'
+
+  TheCloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'CloudFront OAI for ${S3Bucket}'
+
+
+  ########################################################################
+  ## Create Lambda Functions and Associated IAM Resources ################
+  ########################################################################
   # Create Lambda Execution Role that allows it to call DynamoDB
   LambdaDDBExecutionRole:
     Type: AWS::IAM::Role
@@ -409,7 +427,7 @@ Resources:
           client = boto3.client('dynamodb')
 
           def handler(event, context):
-              datetimelist = range(20220601,20220617)
+              datetimelist = range(20220601,20220610)
               for date_time in datetimelist:
                   generateresults("singapore", date_time)
                   generateresults("australia", date_time)
@@ -738,11 +756,17 @@ Resources:
     Properties:
       ServiceToken: !GetAtt LambdaInvoker.Arn
 
-Mappings:
-  EC2AmiIds:
-    ap-southeast-1:
-      "ImageId": ami-0dc5785603ad4ff54
-    ap-southeast-2:
-      "ImageId": ami-0bd2230cfb28832f7
-    ap-northeast-1:
-      "ImageId": ami-0218d08a1f9dac831
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt 
+      - S3Bucket
+      - WebsiteURL
+    Description: URL for website hosted on S3
+  S3BucketSecureURL:
+    Value: !Join 
+      - ''
+      - - 'https://'
+        - !GetAtt 
+          - S3Bucket
+          - DomainName
+    Description: Name of S3 bucket to hold website content
