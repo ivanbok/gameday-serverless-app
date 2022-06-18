@@ -61,7 +61,7 @@ Resources:
           sudo sed 's/replacethiswiththeapiurl/${apiGateway}/g' /gameday-serverless-app/js/load-template.js > /gameday-serverless-app/js/load.js
           cd /
           sudo aws s3 cp gameday-serverless-app s3://${S3Bucket} --recursive
-          # sudo shutdown now
+          sudo shutdown now
   TempServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
