@@ -12,16 +12,6 @@ Resources:
       WebsiteConfiguration:
         IndexDocument: index.html
     DeletionPolicy: Delete
-  
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
-    Properties:
-      BucketEncryption:
-        ServerSideEncryptionConfiguration: 
-          -
-            ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
 
   TheBucketPolicy:
     Type: AWS::S3::BucketPolicy
